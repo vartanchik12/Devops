@@ -1,70 +1,68 @@
-name: CD - Deploy Static Site
-
-on:
-  release:
-    types: [ published ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Show release info
-        run: |
-          echo "Запуск деплоя статического сайта"
-          echo "Релиз: ${{ github.event.release.tag_name }}"
-          echo "Название: ${{ github.event.release.name }}"
-
-      - name: Validate site files
-        run: |
-          echo "Проверка файлов статического сайта:"
-          if [ -f "index.html" ]; then
-            echo "index.html найден"
-            echo "Содержимое index.html:"
-            head -10 index.html
-          else
-            echo "index.html не найден!"
-            exit 1
-          fi
-
-          echo "Все файлы сайта:"
-          find . \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" \) | head -15
-
-      - name: Deploy to server
+- name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.PROXY_HOST }}
+          host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
           script: |
-            echo "Начинаем деплой статического сайта..."
+            echo "Начинаем деплой статического сайта ..."
 
-            cd /home/vboxuser/myapp
+            cd /home/***/myapp
 
             echo "Загружаем обновления..."
             git fetch origin
             git reset --hard origin/github-actions
 
-            echo "Перезапускаем веб-сервер..."
+            echo "Перезапускаем веб-сервер (systemd myapp)..."
             sudo -n systemctl restart myapp
 
-            echo "Проверяем статус:"
+            echo "Проверяем статус сервиса myapp:"
             sleep 2
-            # УБРАЛИ --no-pager, чтобы команда совпадала с тем, что в sudoers
-            sudo -n systemctl status myapp || echo "WARNING: статус сервиса вернуть не удалось"
+            sudo -n systemctl status myapp  echo "WARNING: статус сервиса вернуть не удалось"
 
-            echo "Деплой завершен!"
+            echo "Деплой Лабы 2 завершен!"
             echo "Развернутые файлы:"
             ls -la
 
             echo "Проверка доступности сервиса на порту 8181:"
-            curl -f http://localhost:8181 || echo "Сервис на 8181 не отвечает"
+            curl -f http://localhost:8181  echo "Сервис на 8181 не отвечает"
 
-            echo "Проверка доступности по домену:"
-            curl -f http://app.artanov.course.prafdin.ru || echo "Сайт по домену не отвечает"
-
+            echo "Проверка доступности по домену (Лаба 2):"
+            curl -f http://app.artanov.course.prafdin.ru  echo "Сайт по домену не отвечает"
             echo "Сайт доступен по: http://app.artanov.course.prafdin.ru"
+
+            
+            # 3
+            
+            echo "-----"
+            echo "Начинаем деплой Docker-контейнера ..."
+
+            IMAGE="ghcr.io/vartanchik12/devops/mysite:lab3"
+            CONTAINER_NAME="mysite-lab3"
+            HOST_PORT=8282
+
+            echo "Логинимся в GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+
+            echo "Тянем свежий образ: $IMAGE"
+            docker pull "$IMAGE"
+
+            echo "Останавливаем старый контейнер (если есть)..."
+            docker stop "$CONTAINER_NAME"  echo "Контейнер $CONTAINER_NAME не был запущен"
+
+            echo "Удаляем старый контейнер (если есть)..."
+            docker rm "$CONTAINER_NAME"  echo "Контейнер $CONTAINER_NAME не найден"
+
+            echo "Запускаем новый контейнер..."
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              -p ${HOST_PORT}:80 \
+              --restart=always \
+              "$IMAGE"
+
+            echo "Проверяем доступность Docker-контейнера на http://localhost:${HOST_PORT}"
+            sleep 2
+            curl -f "http://localhost:${HOST_PORT}"  echo "Docker-контейнер на порту ${HOST_PORT} не отвечает"
+
+            echo "Деплой завершен Контейнер слушает порт ${HOST_PORT} на сервере."
