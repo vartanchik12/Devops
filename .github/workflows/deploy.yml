@@ -61,6 +61,6 @@ jobs:
           ls -la
           
           echo "Проверка доступности сайта:"
-          curl -f http://localhost:8080 || echo "Сайт не отвечает"
+          curl -f http://localhost:8181 || echo "Сайт не отвечает"
           
           echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
