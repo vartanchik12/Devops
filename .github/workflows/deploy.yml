@@ -1,4 +1,22 @@
-- name: Deploy to server
+name: Deploy static site and Docker
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -6,8 +24,7 @@
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            echo "Начинаем деплой статического сайта ..."
-
+            echo "Начинаем деплой статического сайта..."
             cd /home/***/myapp
 
             echo "Загружаем обновления..."
@@ -21,20 +38,17 @@
             sleep 2
             sudo -n systemctl status myapp  echo "WARNING: статус сервиса вернуть не удалось"
 
-            echo "Деплой Лабы 2 завершен!"
+            echo "Деплой завершен!"
             echo "Развернутые файлы:"
             ls -la
 
             echo "Проверка доступности сервиса на порту 8181:"
             curl -f http://localhost:8181  echo "Сервис на 8181 не отвечает"
 
-            echo "Проверка доступности по домену (Лаба 2):"
+            echo "Проверка доступности по домену :"
             curl -f http://app.artanov.course.prafdin.ru  echo "Сайт по домену не отвечает"
             echo "Сайт доступен по: http://app.artanov.course.prafdin.ru"
 
-            
-            # 3
-            
             echo "-----"
             echo "Начинаем деплой Docker-контейнера ..."
 
@@ -43,7 +57,7 @@
             HOST_PORT=8282
 
             echo "Логинимся в GitHub Container Registry..."
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
 
             echo "Тянем свежий образ: $IMAGE"
             docker pull "$IMAGE"
@@ -65,4 +79,4 @@
             sleep 2
             curl -f "http://localhost:${HOST_PORT}"  echo "Docker-контейнер на порту ${HOST_PORT} не отвечает"
 
-            echo "Деплой завершен Контейнер слушает порт ${HOST_PORT} на сервере."
+            echo "Деплой завершен. Контейнер слушает порт ${HOST_PORT} на сервере."
