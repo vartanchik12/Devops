@@ -54,7 +54,7 @@ jobs:
 
             echo "Проверяем статус:"
             sleep 2
-            sudo -n systemctl status myapp --no-pager || echo "WARNING: статус сервиса вернуть не удалось"
+            sudo -n systemctl status myapp || echo "WARNING: статус сервиса вернуть не удалось"
 
             echo "Деплой завершен!"
             echo "Развернутые файлы:"
