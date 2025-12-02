@@ -7,64 +7,63 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Show release info
-      run: |
-        echo "Запуск деплоя статического сайта"
-        echo "Релиз: ${{ github.event.release.tag_name }}"
-        echo "Название: ${{ github.event.release.name }}"
-    
-    - name: Validate site files
-      run: |
-        echo "Проверка файлов статического сайта:"
-        if [ -f "index.html" ]; then
-          echo "index.html найден"
-          echo "Содержимое index.html:"
-          head -10 index.html
-        else
-          echo "index.html не найден!"
-          exit 1
-        fi
-        
-        echo "Все файлы сайта:"
-        find . -type f -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" | head -15
-        
-        - name: Deploy to server
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Show release info
+        run: |
+          echo "Запуск деплоя статического сайта"
+          echo "Релиз: ${{ github.event.release.tag_name }}"
+          echo "Название: ${{ github.event.release.name }}"
+
+      - name: Validate site files
+        run: |
+          echo "Проверка файлов статического сайта:"
+          if [ -f "index.html" ]; then
+            echo "index.html найден"
+            echo "Содержимое index.html:"
+            head -10 index.html
+          else
+            echo "index.html не найден!"
+            exit 1
+          fi
+
+          echo "Все файлы сайта:"
+          find . -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" \) | head -15
+
+      - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
-        host: ${{ secrets.PROXY_HOST }}
-        port: ${{ secrets.SSH_PORT }}
-        username: ${{ secrets.SSH_USERNAME }} # тут должен быть vboxuser
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          echo "Начинаем деплой статического сайта..."
-          
-          cd /home/vboxuser/myapp
-          
-          echo "Загружаем обновления..."
-          git fetch origin
-          git reset --hard origin/github-actions
-          
-          echo "Перезапускаем веб-сервер..."
-          sudo -n systemctl restart myapp
-          
-          echo "Проверяем статус:"
-          sleep 2
-          sudo -n systemctl status myapp --no-pager || echo "WARNING: статус сервиса вернуть не удалось"
-          
-          echo "Деплой завершен!"
-          echo "Развернутые файлы:"
-          ls -la
-          
-          echo "Проверка доступности сервиса на порту 8181:"
-          curl -f http://localhost:8181 || echo "Сервис на 8181 не отвечает"
-          
-          echo "Проверка доступности по домену:"
-          curl -f http://app.prafdin.course.prafdin.ru || echo "Сайт по домену не отвечает"
-          
-          echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
+          host: ${{ secrets.PROXY_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }} # должен быть vboxuser
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Начинаем деплой статического сайта..."
 
+            cd /home/vboxuser/myapp
+
+            echo "Загружаем обновления..."
+            git fetch origin
+            git reset --hard origin/github-actions
+
+            echo "Перезапускаем веб-сервер..."
+            sudo -n systemctl restart myapp
+
+            echo "Проверяем статус:"
+            sleep 2
+            sudo -n systemctl status myapp --no-pager || echo "WARNING: статус сервиса вернуть не удалось"
+
+            echo "Деплой завершен!"
+            echo "Развернутые файлы:"
+            ls -la
+
+            echo "Проверка доступности сервиса на порту 8181:"
+            curl -f http://localhost:8181 || echo "Сервис на 8181 не отвечает"
+
+            echo "Проверка доступности по домену:"
+            curl -f http://app.prafdin.course.prafdin.ru || echo "Сайт по домену не отвечает"
+
+            echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
