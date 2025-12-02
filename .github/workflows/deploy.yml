@@ -45,17 +45,27 @@ jobs:
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          echo "Начинаем деплой статического сайта..."
-
-          cd /home/vboxuser/myapp
-          
-
-          echo "Загружаем обновления..."
-          git fetch origin
-          git reset --hard origin/github-actions
-          
-       
-          echo "Деплой завершен!"
-          echo "Развернутые файлы:"
-          ls -la
-          echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
+          script: |
+            echo "Начинаем деплой статического сайта..."
+  
+            cd /home/vboxuser/myapp
+  
+            echo "Загружаем обновления..."
+            git fetch origin
+            git reset --hard origin/github-actions
+  
+            echo "Перезапускаем веб-сервер..."
+            sudo systemctl restart myapp
+  
+            echo "Проверяем статус:"
+            sleep 2
+            sudo systemctl status myapp --no-pager
+  
+            echo "Деплой завершен!"
+            echo "Развернутые файлы:"
+            ls -la
+  
+            echo "Проверка доступности сайта:"
+            curl -f http://localhost || echo "Сайт не отвечает"
+  
+            echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
