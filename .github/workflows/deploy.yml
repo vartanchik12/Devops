@@ -9,34 +9,30 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-
     - name: Checkout code
       uses: actions/checkout@v4
     
- 
     - name: Show release info
       run: |
         echo "Запуск деплоя статического сайта"
         echo "Релиз: ${{ github.event.release.tag_name }}"
         echo "Название: ${{ github.event.release.name }}"
     
-
     - name: Validate site files
       run: |
-        echo " Проверка файлов статического сайта:"
+        echo "Проверка файлов статического сайта:"
         if [ -f "index.html" ]; then
-          echo " index.html найден"
-          echo " Содержимое index.html:"
+          echo "index.html найден"
+          echo "Содержимое index.html:"
           head -10 index.html
         else
-          echo " index.html не найден!"
+          echo "index.html не найден!"
           exit 1
         fi
         
         echo "Все файлы сайта:"
         find . -type f -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" | head -15
     
-
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -45,27 +41,26 @@ jobs:
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          script: |
-            echo "Начинаем деплой статического сайта..."
-  
-            cd /home/vboxuser/myapp
-  
-            echo "Загружаем обновления..."
-            git fetch origin
-            git reset --hard origin/github-actions
-  
-            echo "Перезапускаем веб-сервер..."
-            sudo systemctl restart myapp
-  
-            echo "Проверяем статус:"
-            sleep 2
-            sudo systemctl status myapp --no-pager
-  
-            echo "Деплой завершен!"
-            echo "Развернутые файлы:"
-            ls -la
-  
-            echo "Проверка доступности сайта:"
-             curl -f http://localhost:8080 || echo "Сайт не отвечает"
-  
-            echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
+          echo "Начинаем деплой статического сайта..."
+          
+          cd /home/vboxuser/myapp
+          
+          echo "Загружаем обновления..."
+          git fetch origin
+          git reset --hard origin/github-actions
+          
+          echo "Перезапускаем веб-сервер..."
+          sudo systemctl restart myapp
+          
+          echo "Проверяем статус:"
+          sleep 2
+          sudo systemctl status myapp --no-pager
+          
+          echo "Деплой завершен!"
+          echo "Развернутые файлы:"
+          ls -la
+          
+          echo "Проверка доступности сайта:"
+          curl -f http://localhost:8080 || echo "Сайт не отвечает"
+          
+          echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
