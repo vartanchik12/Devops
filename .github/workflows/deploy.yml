@@ -31,14 +31,14 @@ jobs:
           fi
 
           echo "Все файлы сайта:"
-          find . -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" \) | head -15
+          find . \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" \) | head -15
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROXY_HOST }}
           port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USERNAME }} # должен быть vboxuser
+          username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "Начинаем деплой статического сайта..."
@@ -54,6 +54,7 @@ jobs:
 
             echo "Проверяем статус:"
             sleep 2
+            # УБРАЛИ --no-pager, чтобы команда совпадала с тем, что в sudoers
             sudo -n systemctl status myapp || echo "WARNING: статус сервиса вернуть не удалось"
 
             echo "Деплой завершен!"
@@ -64,6 +65,6 @@ jobs:
             curl -f http://localhost:8181 || echo "Сервис на 8181 не отвечает"
 
             echo "Проверка доступности по домену:"
-            curl -f http://app.prafdin.course.prafdin.ru || echo "Сайт по домену не отвечает"
+            curl -f http://app.artanov.course.prafdin.ru || echo "Сайт по домену не отвечает"
 
-            echo "Сайт доступен по: http://app.prafdin.course.prafdin.ru"
+            echo "Сайт доступен по: http://app.artanov.course.prafdin.ru"
