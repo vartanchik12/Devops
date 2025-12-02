@@ -22,61 +22,55 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}   # ← ТВОЙ СЕКРЕТ
           script: |
-            echo "Начинаем деплой статического сайта..."
+            echo "=====  деплой статического сайта через systemd ====="
             cd /home/***/myapp
 
-            echo "Загружаем обновления..."
+            echo "Обновляем git..."
             git fetch origin
             git reset --hard origin/github-actions
 
-            echo "Перезапускаем веб-сервер (systemd myapp)..."
+            echo "Рестартуем systemd сервис myapp..."
             sudo -n systemctl restart myapp
 
-            echo "Проверяем статус сервиса myapp:"
+            echo "Проверяем статус:"
             sleep 2
-            sudo -n systemctl status myapp  echo "WARNING: статус сервиса вернуть не удалось"
+            sudo -n systemctl status myapp  echo "WARNING: systemd status не удалось получить"
 
-            echo "Деплой завершен!"
-            echo "Развернутые файлы:"
-            ls -la
+            echo "Проверяем сайт на порту 8181..."
+            curl -f http://localhost:8181  echo "Сервис 8181 не отвечает"
 
-            echo "Проверка доступности сервиса на порту 8181:"
-            curl -f http://localhost:8181  echo "Сервис на 8181 не отвечает"
+            echo "Проверяем домен ."
+            curl -f http://app.artanov.course.prafdin.ru  echo "Домен не отвечает"
 
-            echo "Проверка доступности по домену :"
-            curl -f http://app.artanov.course.prafdin.ru  echo "Сайт по домену не отвечает"
-            echo "Сайт доступен по: http://app.artanov.course.prafdin.ru"
-
-            echo "-----"
-            echo "Начинаем деплой Docker-контейнера ..."
+            echo "===== деплой Docker-контейнера ====="
 
             IMAGE="ghcr.io/vartanchik12/devops/mysite:lab3"
             CONTAINER_NAME="mysite-lab3"
             HOST_PORT=8282
 
-            echo "Логинимся в GitHub Container Registry..."
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+            echo "Логинимся в GHCR..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
 
-            echo "Тянем свежий образ: $IMAGE"
+            echo "Тянем последний образ..."
             docker pull "$IMAGE"
 
             echo "Останавливаем старый контейнер (если есть)..."
-            docker stop "$CONTAINER_NAME"  echo "Контейнер $CONTAINER_NAME не был запущен"
+            docker stop "$CONTAINER_NAME"  echo "Контейнер не был запущен"
 
             echo "Удаляем старый контейнер (если есть)..."
-            docker rm "$CONTAINER_NAME"  echo "Контейнер $CONTAINER_NAME не найден"
+            docker rm "$CONTAINER_NAME"  echo "Контейнер отсутствует"
 
-            echo "Запускаем новый контейнер..."
+            echo "Запускаем новый Docker-контейнер..."
             docker run -d \
               --name "$CONTAINER_NAME" \
               -p ${HOST_PORT}:80 \
               --restart=always \
               "$IMAGE"
 
-            echo "Проверяем доступность Docker-контейнера на http://localhost:${HOST_PORT}"
+            echo "Проверяем доступность Docker-сайта..."
             sleep 2
-            curl -f "http://localhost:${HOST_PORT}"  echo "Docker-контейнер на порту ${HOST_PORT} не отвечает"
+            curl -f http://localhost:${HOST_PORT}  echo "Docker сайт не отвечает"
 
-            echo "Деплой завершен. Контейнер слушает порт ${HOST_PORT} на сервере."
+            echo "===== Деплой  полностью завершён ====="
