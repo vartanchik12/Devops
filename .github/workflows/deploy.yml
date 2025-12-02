@@ -50,11 +50,11 @@ jobs:
           git reset --hard origin/github-actions
           
           echo "Перезапускаем веб-сервер..."
-          sudo systemctl restart myapp
+          sudo -n systemctl restart myapp
           
           echo "Проверяем статус:"
           sleep 2
-          sudo systemctl status myapp --no-pager
+          sudo -n systemctl status myapp --no-pager
           
           echo "Деплой завершен!"
           echo "Развернутые файлы:"
