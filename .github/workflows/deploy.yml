@@ -1,12 +1,12 @@
-name: Deploy static site and Docker
+name: Deploy static site and Docker container
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [ github-actions ]
 
 permissions:
   contents: read
-  packages: read
+  packages: write
 
 jobs:
   deploy:
@@ -16,61 +16,69 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Deploy to server
+      - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
+          host: ${{ secrets.PROXY_HOST }}
           port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}   # ← ТВОЙ СЕКРЕТ
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "=====  деплой статического сайта через systemd ====="
+
             cd /home/***/myapp
 
-            echo "Обновляем git..."
+            echo "Загружаем обновления..."
             git fetch origin
             git reset --hard origin/github-actions
 
-            echo "Рестартуем systemd сервис myapp..."
+            echo "Перезапускаем веб-сервер (systemd myapp)..."
             sudo -n systemctl restart myapp
 
-            echo "Проверяем статус:"
+            echo "Проверяем статус сервиса myapp:"
             sleep 2
-            sudo -n systemctl status myapp  echo "WARNING: systemd status не удалось получить"
+            sudo -n systemctl status myapp  echo "WARNING: статус сервиса вернуть не удалось"
 
-            echo "Проверяем сайт на порту 8181..."
-            curl -f http://localhost:8181  echo "Сервис 8181 не отвечает"
+            echo "Деплой  завершен!"
+            echo "Развернутые файлы :"
+            ls -la
 
-            echo "Проверяем домен ."
-            curl -f http://app.artanov.course.prafdin.ru  echo "Домен не отвечает"
+            echo "Проверка доступности сервиса на порту 8181:"
+            curl -f http://localhost:8181  echo "Сервис на 8181 не отвечает"
 
-            echo "===== деплой Docker-контейнера ====="
+            echo "Проверка доступности по домену :"
+            curl -f http://app.artanov.course.prafdin.ru  echo "Сайт по домену не отвечает"
+            echo "Сайт доступен по: http://app.artanov.course.prafdin.ru"
+
+            echo "-----"
+            echo "=====  деплой Docker-контейнера ====="
 
             IMAGE="ghcr.io/vartanchik12/devops/mysite:lab3"
             CONTAINER_NAME="mysite-lab3"
             HOST_PORT=8282
 
-            echo "Логинимся в GHCR..."
+            echo "Логинимся в GitHub Container Registry..."
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
 
-            echo "Тянем последний образ..."
+            echo "Тянем свежий образ: $IMAGE"
             docker pull "$IMAGE"
 
             echo "Останавливаем старый контейнер (если есть)..."
-            docker stop "$CONTAINER_NAME"  echo "Контейнер не был запущен"
+            docker stop "$CONTAINER_NAME"  echo "Контейнер $CONTAINER_NAME не был запущен"
 
             echo "Удаляем старый контейнер (если есть)..."
-            docker rm "$CONTAINER_NAME"  echo "Контейнер отсутствует"
+            docker rm "$CONTAINER_NAME"  echo "Контейнер $CONTAINER_NAME не найден"
 
-            echo "Запускаем новый Docker-контейнер..."
+            echo "Запускаем новый контейнер..."
             docker run -d \
               --name "$CONTAINER_NAME" \
               -p ${HOST_PORT}:80 \
               --restart=always \
               "$IMAGE"
 
-            echo "Проверяем доступность Docker-сайта..."
+            echo "Проверяем доступность Docker-контейнера на http://localhost:${HOST_PORT}"
             sleep 2
-            curl -f http://localhost:${HOST_PORT}  echo "Docker сайт не отвечает"
+            curl -f "http://localhost:${HOST_PORT}"  echo "Docker-контейнер на порту ${HOST_PORT} не отвечает"
 
-            echo "===== Деплой  полностью завершён ====="
+            echo "Деплой завершен. Контейнер слушает порт ${HOST_PORT}."
+            echo "Проверь по адресу: http://app.artanov.course.prafdin.ru (Лаба 2) и http://app.artanov.course.prafdin.ru:8282 (Лаба 3 через frp, если настроен)."
