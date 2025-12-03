@@ -1,96 +1,65 @@
-name: CI/CD for Lab2 + Lab3
+name: CD - Deploy Static Site
 
 on:
-  push:
-    branches:
-      - github-actions
-
-permissions:
-  contents: read
-  packages: write
+  release:
+    types: [ published ]
 
 jobs:
-
-  # ---------------------------
-  # 1. CI — build and push Docker
-  # ---------------------------
-
-  build_and_push:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Show release info
+        run: |
+          echo "Запуск деплоя статического сайта"
+          echo "Релиз: ${{ github.event.release.tag_name }}"
+          echo "Название: ${{ github.event.release.name }}"
 
-      - name: Build & Push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/devops/mysite:lab3
+      - name: Validate site files
+        run: |
+          echo "Проверка файлов статического сайта:"
+          if [ -f "index.html" ]; then
+            echo "index.html найден"
+            echo "Содержимое index.html:"
+            head -10 index.html
+          else
+            echo "index.html не найден!"
+            exit 1
+          fi
 
-  # ---------------------------
-  # 2. CD — deploy to VM 
-  # ---------------------------
+          echo "Все файлы сайта:"
+          find . \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" \) | head -15
 
-  deploy:
-    needs: build_and_push
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Deploy to VM via SSH
+      - name: Deploy to server (systemd myapp)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROXY_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-
           script: |
+            echo "=== Deploy via systemd myapp ==="
 
-            echo "===  systemd static site ==="
             cd /home/vboxuser/myapp
 
             echo "Fetching new code..."
             git fetch origin
-            git reset --hard origin/dock
+            git reset --hard origin/github-actions
 
-            echo "Restarting systemd service..."
+            echo "Restarting systemd service myapp..."
             sudo -n systemctl restart myapp || true
 
-            echo "Checking port 8181..."
-            curl -f http://localhost:8181 || echo " systemd site unreachable"
-
-            echo "===  Docker deployment ==="
-
-            IMAGE="ghcr.io/vartanchik12/devops/mysite:lab3"
-            CONTAINER="mysite-lab3"
-
-            echo "Pulling image..."
-            docker pull $IMAGE
-
-            echo "Stopping old container..."
-            docker stop $CONTAINER || true
-
-            echo "Removing old container..."
-            docker rm $CONTAINER || true
-
-            echo "Running new container..."
-            docker run -d \
-              --name $CONTAINER \
-              -p 8181:80 \
-              --restart=always \
-              $IMAGE
+            echo "Checking myapp status..."
+            sleep 2
+            sudo -n systemctl status myapp || echo "WARNING: unable to get myapp status"
 
             echo "Checking port 8181..."
-            curl -f http://localhost:8181 || echo " docker site unreachable"
+            curl -f http://localhost:8181 || echo "systemd site unreachable on 8181"
 
-            echo "=== Deployment COMPLETE ==="
+            echo "Checking domain..."
+            curl -f http://app.artanov.course.prafdin.ru || echo "site not reachable by domain"
 
+            echo "===deploy DONE ==="
