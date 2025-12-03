@@ -60,7 +60,7 @@ jobs:
 
             echo "Fetching new code..."
             git fetch origin
-            git reset --hard origin/github-actions
+            git reset --hard origin/dock
 
             echo "Restarting systemd service..."
             sudo -n systemctl restart myapp || true
