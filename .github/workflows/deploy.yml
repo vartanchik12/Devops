@@ -1,4 +1,4 @@
-name: CD - Deploy Static Site
+name: CD - Deploy Docker Static Site
 
 on:
   release:
@@ -7,6 +7,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/myapp:latest
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -14,52 +20,48 @@ jobs:
 
       - name: Show release info
         run: |
-          echo "Запуск деплоя статического сайта"
+          echo "Запуск деплоя статического сайта (Docker)"
           echo "Релиз: ${{ github.event.release.tag_name }}"
           echo "Название: ${{ github.event.release.name }}"
+          echo "Образ: $IMAGE_NAME"
 
-      - name: Validate site files
-        run: |
-          echo "Проверка файлов статического сайта:"
-          if [ -f "index.html" ]; then
-            echo "index.html найден"
-            echo "Содержимое index.html:"
-            head -10 index.html
-          else
-            echo "index.html не найден!"
-            exit 1
-          fi
-
-          echo "Все файлы сайта:"
-          find . \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" \) | head -15
-
-      - name: Deploy to server (systemd myapp)
+      - name: Deploy over SSH (Docker)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROXY_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_NAME,GHCR_TOKEN
           script: |
-            echo "=== Deploy via systemd myapp ==="
+            echo "=== Docker deploy ==="
+            echo "Using image: $IMAGE_NAME"
 
-            cd /home/vboxuser/myapp
+            echo "Stopping and disabling old systemd service..."
+            sudo -n systemctl stop myapp || true
+            sudo -n systemctl disable myapp || true
 
-            echo "Fetching new code..."
-            git fetch origin
-            git reset --hard origin/github-actions
+            echo "Logging in to GHCR..."
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            echo "Restarting systemd service myapp..."
-            sudo -n systemctl restart myapp || true
+            echo "Pulling image..."
+            docker pull "$IMAGE_NAME"
 
-            echo "Checking myapp status..."
-            sleep 2
-            sudo -n systemctl status myapp || echo "WARNING: unable to get myapp status"
+            echo "Stopping old Docker container (if exists)..."
+            docker stop myapp || true
+            docker rm myapp || true
+
+            echo "Starting new Docker container..."
+            docker run -d --name myapp \
+              --restart always \
+              -p 8181:80 \
+              "$IMAGE_NAME"
 
             echo "Checking port 8181..."
-            curl -f http://localhost:8181 || echo "systemd site unreachable on 8181"
+            curl -f http://localhost:8181 || echo "Docker site unreachable on 8181"
 
             echo "Checking domain..."
             curl -f http://app.artanov.course.prafdin.ru || echo "site not reachable by domain"
 
-            echo "===deploy DONE ==="
+            echo "=== Docker deploy DONE ==="
+
