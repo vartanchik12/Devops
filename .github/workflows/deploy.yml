@@ -85,12 +85,12 @@ jobs:
             echo "Running new container..."
             docker run -d \
               --name $CONTAINER \
-              -p 8282:80 \
+              -p 8181:80 \
               --restart=always \
               $IMAGE
 
-            echo "Checking port 8282..."
-            curl -f http://localhost:8282 || echo " docker site unreachable"
+            echo "Checking port 8181..."
+            curl -f http://localhost:8181 || echo " docker site unreachable"
 
             echo "=== Deployment COMPLETE ==="
 
