@@ -1,67 +1,44 @@
-name: CD - Deploy Docker Static Site
+name: CD - Deploy via Docker Compose
 
 on:
   release:
-    types: [ published ]
+    types: [published]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-    env:
-      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/myapp:latest
-      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Show release info
-        run: |
-          echo "Запуск деплоя статического сайта (Docker)"
-          echo "Релиз: ${{ github.event.release.tag_name }}"
-          echo "Название: ${{ github.event.release.name }}"
-          echo "Образ: $IMAGE_NAME"
-
-      - name: Deploy over SSH (Docker)
+      - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROXY_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_NAME,GHCR_TOKEN
           script: |
-            echo "=== Docker deploy ==="
-            echo "Using image: $IMAGE_NAME"
+            echo "Stopping old systemd version..."
+            sudo systemctl stop myapp || true
+            sudo systemctl disable myapp || true
 
-            echo "Stopping and disabling old systemd service..."
-            sudo -n systemctl stop myapp || true
-            sudo -n systemctl disable myapp || true
+            echo "Logging into GHCR..."
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            echo "Logging in to GHCR..."
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            echo "Pulling latest image..."
+            docker pull ghcr.io/vartanchik12/myapp:latest
 
-            echo "Pulling image..."
-            docker pull "$IMAGE_NAME"
+            echo "Fetching latest repo..."
+            cd /home/vboxuser/myapp
+            git fetch --all
+            git reset --hard origin/docker-lab4
 
-            echo "Stopping old Docker container (if exists)..."
-            docker stop myapp || true
-            docker rm myapp || true
+            echo "Deploying via Docker Compose..."
+            docker compose down || true
+            docker compose up -d --pull always
 
-            echo "Starting new Docker container..."
-            docker run -d --name myapp \
-              --restart always \
-              -p 8181:80 \
-              "$IMAGE_NAME"
-
-            echo "Checking port 8181..."
-            curl -f http://localhost:8181 || echo "Docker site unreachable on 8181"
-
-            echo "Checking domain..."
-            curl -f http://app.artanov.course.prafdin.ru || echo "site not reachable by domain"
-
-            echo "=== Docker deploy DONE ==="
+            echo "Checking app..."
+            curl -f http://localhost:8181 || echo "Application might not be ready"
 
