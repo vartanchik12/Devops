@@ -1,4 +1,4 @@
-name: CD - Deploy via Docker Compose
+name: CD - Docker Compose Deploy
 
 on:
   release:
@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy over SSH
+      - name: Deploy via SSH and docker compose
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROXY_HOST }}
@@ -20,25 +20,39 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "Stopping old systemd version..."
-            sudo systemctl stop myapp || true
-            sudo systemctl disable myapp || true
+            echo "===  deploy via docker compose ==="
 
-            echo "Logging into GHCR..."
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-            echo "Pulling latest image..."
-            docker pull ghcr.io/vartanchik12/myapp:latest
-
-            echo "Fetching latest repo..."
             cd /home/vboxuser/myapp
-            git fetch --all
+
+            echo "--- Fetch latest code ---"
+            git fetch origin
             git reset --hard origin/docker-lab4
 
-            echo "Deploying via Docker Compose..."
-            docker compose down || true
-            docker compose up -d --pull always
+            echo "--- Stop systemd ---"
+            sudo -n systemctl stop myapp || true
+            sudo -n systemctl disable myapp || true
 
-            echo "Checking app..."
-            curl -f http://localhost:8181 || echo "Application might not be ready"
+            echo "--- Stop old docker containers (lab3) ---"
+            docker stop myapp || true
+            docker rm myapp || true
+
+            echo "--- Login to GHCR ---"
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            echo "--- Pull latest image ---"
+            docker pull ghcr.io/vartanchik12/myapp:latest || true
+
+            echo "--- Compose down ---"
+            docker compose down || true
+
+            echo "--- Compose up ---"
+            docker compose up -d
+
+            echo "--- Check containers ---"
+            docker compose ps
+
+            echo "--- Check app ---"
+            curl -f http://localhost:8181 || echo "compose app unreachable on 8181"
+
+            echo "=== deploy DONE ==="
 
