@@ -1,4 +1,4 @@
-name: CD - Docker Compose Deploy
+name: CD - Lab4 Docker Compose Deploy
 
 on:
   release:
@@ -7,6 +7,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: ghcr.io/vartanchik12/myapp:latest
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -19,8 +22,9 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_NAME,GHCR_TOKEN
           script: |
-            echo "===  deploy via docker compose ==="
+            echo "===deploy via docker compose ==="
 
             cd /home/vboxuser/myapp
 
@@ -28,22 +32,25 @@ jobs:
             git fetch origin
             git reset --hard origin/docker-lab4
 
-            echo "--- Stop systemd ---"
+            echo "--- Stop systemd---"
             sudo -n systemctl stop myapp || true
             sudo -n systemctl disable myapp || true
 
-            echo "--- Stop old docker containers (lab3) ---"
+            echo "--- Stop old single container ---"
             docker stop myapp || true
             docker rm myapp || true
 
+            echo "--- Remove old image to force download ---"
+            docker rmi "$IMAGE_NAME" || true
+
             echo "--- Login to GHCR ---"
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            echo "--- Pull latest image ---"
-            docker pull ghcr.io/vartanchik12/myapp:latest || true
-
-            echo "--- Compose down ---"
+            echo "--- Compose down (old stack) ---"
             docker compose down || true
+
+            echo "--- Compose pull (THIS will show download) ---"
+            docker compose pull
 
             echo "--- Compose up ---"
             docker compose up -d
@@ -51,8 +58,8 @@ jobs:
             echo "--- Check containers ---"
             docker compose ps
 
-            echo "--- Check app ---"
+            echo "--- Check app on 8181 ---"
             curl -f http://localhost:8181 || echo "compose app unreachable on 8181"
 
-            echo "=== deploy DONE ==="
+            echo "===deploy DONE ==="
 
